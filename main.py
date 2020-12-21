@@ -1,8 +1,9 @@
 import discord
 import os
 import time
-from datetime import datetime
+from datetime import datetime, timedelta, date
 from replit import db
+import calendar
 import sqlite3
 
 client = discord.Client()
@@ -182,6 +183,97 @@ def today():
 
   return out
 
+def week():
+  current_date = datetime.today().date()
+  out = "Things happening in the next week \n \nEvents: \n"
+  names = []
+
+  conn = sqlite3.connect('test.db')
+  cursor = conn.cursor()
+  
+  #Find names of all today's events
+  sql = ('''Select Name from Events where date(Date)>=? and date(Date)<=?''') 
+  max_date = current_date + timedelta(days=7)
+  cursor.execute(sql, (current_date, max_date))
+  names = cursor.fetchall();
+  conn.commit()
+  cursor.close()
+  
+  #edit output 
+  for i in range(len(names)):
+    out = out + names[i][0] + "\n"
+  out = out + "\n" + "Birthdays: \n"
+
+  conn = sqlite3.connect('test.db')
+  cursor = conn.cursor()
+
+  sql = ('''Select ID, day, month from Bday_table''')  
+  cursor.execute(sql, ())
+  result = cursor.fetchall();
+  conn.commit()
+  cursor.close()
+  
+  for i in range(len(result)):
+    b_day = result[i][1]
+    b_month = result[i][2]
+    c_year = current_date.year
+    b_date_str = ""+str(b_day)+"-"+str(b_month)+"-"+str(c_year)
+    b_date = datetime.strptime(b_date_str, '%d-%m-%Y').date()
+    #d1 = date.datetime(c_year, b_month, b_day)
+    if b_date>=current_date and b_date<=max_date:
+      member = client.get_user(int(result[i][0]))
+      str_name = member.name
+      out = out + str_name + "\n"
+
+  return out
+
+def month():
+  current_date = datetime.today().date()
+  current_m = current_date.month
+  current_d = current_date.day
+  current_y = current_date.year
+
+  max_day = calendar.monthrange(current_y,current_m)[1]
+  b_date_str = ""+str(max_day)+"-"+str(current_m)+"-"+str(current_y)
+  max_date = datetime.strptime(b_date_str, '%d-%m-%Y').date()
+
+  out = "Things still happening this month \n \nEvents: \n"
+  names = []
+  ids = []
+  
+  conn = sqlite3.connect('test.db')
+  cursor = conn.cursor()
+  
+  #Find names of all today's events
+  sql = ('''Select Name from Events where date(Date)>=? and date(Date)<=?''') 
+  cursor.execute(sql, (current_date, max_date))
+  names = cursor.fetchall();
+  conn.commit()
+  cursor.close()
+  
+  #edit output 
+  for i in range(len(names)):
+    out = out + names[i][0] + "\n"
+  out = out + "\n" + "Birthdays: \n"
+
+
+  conn = sqlite3.connect('test.db')
+  cursor = conn.cursor()
+
+  sql = ('''Select ID from Bday_table where day>=? and month=?''')  
+  cursor.execute(sql, (current_d, current_m,))
+  ids = cursor.fetchall();
+  conn.commit()
+  cursor.close()
+
+  #edit output
+  for i in range(len(ids)):
+    member = client.get_user(int(ids[i][0]))
+    str_name = member.name
+    out = out + str_name + "\n"
+
+  return out
+
 #boot up
 @client.event
 async def on_ready():
@@ -259,9 +351,19 @@ async def on_message(message):
       out = delete_all()
       await message.channel.send(out)
 
-    #Show todays events
+    #Show today's events
     if msg.startswith('$Today'):
       out = today()
+      await message.channel.send(out)
+    
+    #Show week's events
+    if msg.startswith('$Week'):
+      out = week()
+      await message.channel.send(out)
+
+    #Show upcomming month's events
+    if msg.startswith('$Month'):
+      out = month()
       await message.channel.send(out)
 
 #Token
