@@ -15,13 +15,15 @@ cursor = conn.cursor()
 conn.execute('''CREATE TABLE IF NOT EXISTS Events
          (ID INTEGER PRIMARY KEY     AUTOINCREMENT,
          NAME           TEXT     NOT NULL,
-         Date           TEXT     NOT NULL,
-         Reminder       TEXT     NOT NULL);''')
+         Date           DATETIME     NOT NULL,
+         Reminder       TEXT     );''')
 print("Event Table created successfully")
 
 conn.execute('''CREATE TABLE IF NOT EXISTS Bday_table
          (ID INTEGER PRIMARY KEY NOT NULL,
-         Date           TEXT     NOT NULL,
+         Date           DATETIME     NOT NULL,
+         Day            INT, 
+         Month          INT, 
          Reminder       TEXT     );''')
 print("Bday Table created successfully")
 
@@ -40,7 +42,7 @@ def add_event(event_name, event_date, event_remider):
   cursor = conn.cursor()
   
   conn.execute("INSERT INTO Events (NAME, Date, Reminder) VALUES(?, ?, ?)", 
-                                                  (event_name, event_date, event_remider)) 
+  (event_name, event_date, event_remider)) 
   conn.commit()
   cursor.close()
 
@@ -50,8 +52,8 @@ def add_bday(id, bday_date, bday_remider):
   conn = sqlite3.connect('test.db')
   cursor = conn.cursor()
   
-  conn.execute("INSERT INTO Bday_table (id, Date, Reminder) VALUES(?, ?, ?)", 
-                                                  (id, bday_date, bday_remider)) 
+  conn.execute("INSERT INTO Bday_table (id, Date, Day, Month, Reminder) VALUES(?, ?, ?, ?, ?)", 
+  (id, bday_date, bday_date.day, bday_date.month, bday_remider)) 
   conn.commit()
   cursor.close()
 
@@ -139,54 +141,44 @@ def delete_all():
 
 def today():
   current_date = datetime.today().date()
+
+  print(current_date)
+  current_d = current_date.day
+  current_m = current_date.month
   out = "Things happening today \n \nEvents: \n"
   names = []
-  dates = []
   ids = []
-  #SQL
+  
   conn = sqlite3.connect('test.db')
   cursor = conn.cursor()
-  cursor.execute('''Select Name from Events;''') 
+  
+  #Find names of all today's events
+  sql = ('''Select Name from Events where date(Date)=?''') 
+  cursor.execute(sql, (current_date,))
   names = cursor.fetchall();
-
-  cursor.execute('''Select Date from Events;''') 
-  dates = cursor.fetchall(); 
-
   conn.commit()
   cursor.close()
-
-  conn = sqlite3.connect('test.db')
-  cursor = conn.cursor()
-
-  for i in range(len(names)):
-    str_name = names[i][0]
-    str_date = dates[i][0]
-    date_time_obj = datetime.strptime(str_date, '%Y-%m-%d %H:%M:%S')
-    i_date = date_time_obj.date()
-    if i_date == current_date:
-      out = out + str_name + "\n"
   
+  #edit output 
+  for i in range(len(names)):
+    out = out + names[i][0] + "\n"
   out = out + "\n" + "Birthdays: \n"
 
-  cursor.execute('''Select ID from Bday_table;''') 
-  ids = cursor.fetchall();
 
-  cursor.execute('''Select Date from Bday_table;''') 
-  dates = cursor.fetchall(); 
-  
+  conn = sqlite3.connect('test.db')
+  cursor = conn.cursor()
+
+  sql = ('''Select ID from Bday_table where day=? and month=?''')  
+  cursor.execute(sql, (current_d, current_m,))
+  ids = cursor.fetchall();
   conn.commit()
   cursor.close()
 
+  #edit output
   for i in range(len(ids)):
     member = client.get_user(int(ids[i][0]))
     str_name = member.name
-    str_date = dates[i][0]
-    date_time_obj = datetime.strptime(str_date, '%d/%m/%Y')
-    
-    i_date = date_time_obj.date()
-
-    if (int(i_date.day) == int(current_date.day)) and (int(i_date.month) == int(current_date.month)):
-      out = out + str_name + "\n"
+    out = out + str_name + "\n"
 
   return out
 
@@ -223,8 +215,8 @@ async def on_message(message):
         event_name = event_arr[1]
         event_date =  event_arr[2]
         event_remider =  event_arr[3]
-        event_date_obj = datetime.strptime(event_date, '%d/%m/%Y %H:%M:%S')
-        event_remider_obj = datetime.strptime(event_remider, '%d/%m/%Y %H:%M:%S')
+        event_date_obj = datetime.strptime(event_date, '%d-%m-%Y %H:%M:%S')
+        event_remider_obj = datetime.strptime(event_remider, '%d-%m-%Y %H:%M:%S')
         add_event(event_name, event_date_obj, event_remider_obj)
 
         await message.channel.send("Your event named: " + event_name + " that will occur on " + event_date + " has been added.")
@@ -236,8 +228,8 @@ async def on_message(message):
         member = await message.guild.fetch_member(int(bday_id))
         bday_name = member.name
         event_date =  event_arr[2][1:]
-        event_dt_obj = datetime.strptime(event_date, '%d/%m/%Y')
-        add_bday(int(bday_id), event_date, "0")
+        event_dt_obj = datetime.strptime(event_date, '%d-%m-%Y')
+        add_bday(int(bday_id), event_dt_obj, "0")
         await message.channel.send("Bday of " + at_user(bday_id) +" has been added.")
 
     #View all events command
